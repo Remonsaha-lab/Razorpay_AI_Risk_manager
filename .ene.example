@@ -1,0 +1,17 @@
+# DisputeGuard Environment Variables
+# Copy this file to .env and fill in your values
+# NEVER commit the .env file
+
+# AI Provider (choose one)
+OPENAI_API_KEY=
+GEMINI_API_KEY=
+
+# Backend
+BACKEND_PORT=8000
+BACKEND_HOST=127.0.0.1
+
+# Frontend
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+
+# Environment
+ENVIRONMENT=development

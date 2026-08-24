@@ -1,0 +1,94 @@
+{
+  "policy_id": "merchandise_not_received_v1",
+  "version": "1.0.0",
+  "scope": "SYNTHETIC DEMO ONLY — not for production use",
+  "loss_class": "merchandise_not_received",
+  "description": "Policy for card-not-present disputes where the cardholder claims physical goods were not received.",
+
+  "required_evidence": [
+    {
+      "type": "invoice",
+      "label": "Purchase Invoice",
+      "required": true,
+      "description": "Original invoice showing order ID, amount, item(s), and customer details"
+    },
+    {
+      "type": "tracking_record",
+      "label": "Carrier Tracking Record",
+      "required": true,
+      "description": "Carrier-provided tracking showing shipment movement and delivery status"
+    },
+    {
+      "type": "proof_of_delivery",
+      "label": "Proof of Delivery",
+      "required": true,
+      "description": "Delivery confirmation with date, recipient name, or signature"
+    },
+    {
+      "type": "order_confirmation",
+      "label": "Order Confirmation",
+      "required": false,
+      "description": "System-generated order confirmation sent to customer"
+    },
+    {
+      "type": "customer_communication",
+      "label": "Customer Communication",
+      "required": false,
+      "description": "Any emails or messages between merchant and customer"
+    }
+  ],
+
+  "required_checks": [
+    {
+      "check_id": "order_id_match",
+      "description": "Order ID on invoice must exactly match dispute order ID",
+      "type": "exact_match",
+      "severity": "critical"
+    },
+    {
+      "check_id": "amount_match",
+      "description": "Invoice amount must exactly match dispute amount (Decimal comparison)",
+      "type": "exact_match",
+      "severity": "critical"
+    },
+    {
+      "check_id": "tracking_id_match",
+      "description": "Tracking ID on shipping label must match carrier tracking record",
+      "type": "exact_match",
+      "severity": "critical"
+    },
+    {
+      "check_id": "delivery_before_deadline",
+      "description": "Delivery date must be before the dispute response deadline",
+      "type": "date_comparison",
+      "severity": "critical"
+    },
+    {
+      "check_id": "delivery_before_dispute",
+      "description": "Delivery date must be before the dispute was filed",
+      "type": "date_comparison",
+      "severity": "high"
+    },
+    {
+      "check_id": "address_consistency",
+      "description": "Shipping address should match billing address or customer-provided address",
+      "type": "consistency_check",
+      "severity": "medium"
+    }
+  ],
+
+  "thresholds": {
+    "min_completeness_to_contest": 0.8,
+    "min_evidence_strength_to_contest": 0.6,
+    "contradiction_forces_review": true,
+    "max_days_to_gather_evidence": 5
+  },
+
+  "economic_assumptions": {
+    "contest_cost_inr": 500,
+    "base_win_probability": 0.65,
+    "strong_evidence_win_probability": 0.85,
+    "weak_evidence_win_probability": 0.35,
+    "note": "These are synthetic demo assumptions, not calibrated probabilities"
+  }
+}
