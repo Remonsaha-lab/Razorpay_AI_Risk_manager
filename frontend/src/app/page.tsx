@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import {
@@ -22,103 +23,18 @@ import {
   FileWarning,
   CheckCircle2,
   XCircle,
+  Loader2,
 } from "lucide-react";
-
-/* ── Metric card data ── */
-const metrics = [
-  {
-    title: "Active Disputes",
-    value: "23",
-    change: "+3 today",
-    changeType: "warning" as const,
-    icon: FileWarning,
-    iconColor: "text-warning",
-    iconBg: "bg-warning/10",
-  },
-  {
-    title: "Win Rate",
-    value: "78.4%",
-    change: "+2.1% this month",
-    changeType: "success" as const,
-    icon: TrendingUp,
-    iconColor: "text-accent",
-    iconBg: "bg-accent/10",
-  },
-  {
-    title: "Amount at Risk",
-    value: "₹4.2L",
-    change: "12 cases pending",
-    changeType: "destructive" as const,
-    icon: IndianRupee,
-    iconColor: "text-danger",
-    iconBg: "bg-danger/10",
-  },
-  {
-    title: "Avg Response Time",
-    value: "2.4 hrs",
-    change: "-18% vs last week",
-    changeType: "success" as const,
-    icon: Clock,
-    iconColor: "text-brand-400",
-    iconBg: "bg-brand-400/10",
-  },
-];
-
-/* ── Recent disputes mock data ── */
-const recentDisputes = [
-  {
-    id: "DSP-2026-001",
-    merchant: "TechMart India",
-    amount: "₹18,400",
-    reason: "Merchandise not received",
-    status: "pending_review",
-    risk: "high",
-    deadline: "Sep 4, 2026",
-  },
-  {
-    id: "DSP-2026-002",
-    merchant: "StyleHub",
-    amount: "₹7,250",
-    reason: "Not as described",
-    status: "evidence_gathered",
-    risk: "medium",
-    deadline: "Sep 6, 2026",
-  },
-  {
-    id: "DSP-2026-003",
-    merchant: "FoodExpress",
-    amount: "₹3,100",
-    reason: "Duplicate charge",
-    status: "representment_sent",
-    risk: "low",
-    deadline: "Sep 8, 2026",
-  },
-  {
-    id: "DSP-2026-004",
-    merchant: "BookWorld",
-    amount: "₹12,800",
-    reason: "Unauthorized transaction",
-    status: "won",
-    risk: "low",
-    deadline: "Resolved",
-  },
-  {
-    id: "DSP-2026-005",
-    merchant: "GadgetZone",
-    amount: "₹45,000",
-    reason: "Service not provided",
-    status: "pending_review",
-    risk: "critical",
-    deadline: "Sep 2, 2026",
-  },
-];
+import { fetchCases, type CaseSummary } from "@/lib/api";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" | "destructive" }> = {
   pending_review:      { label: "Pending Review",      variant: "warning" },
   evidence_gathered:   { label: "Evidence Gathered",    variant: "default" },
+  validation_complete: { label: "Validation Complete",  variant: "secondary" },
   representment_sent:  { label: "Representment Sent",   variant: "secondary" },
   won:                 { label: "Won",                  variant: "success" },
   lost:                { label: "Lost",                 variant: "destructive" },
+  accepted_loss:       { label: "Accepted Loss",        variant: "destructive" },
 };
 
 const riskConfig: Record<string, { label: string; color: string }> = {
@@ -128,15 +44,86 @@ const riskConfig: Record<string, { label: string; color: string }> = {
   critical: { label: "Critical", color: "text-danger" },
 };
 
+function formatAmount(amount: string): string {
+  const num = parseFloat(amount);
+  if (isNaN(num)) return `₹${amount}`;
+  return `₹${num.toLocaleString("en-IN")}`;
+}
+
+function formatDeadline(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleDateString("en-IN", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function DashboardPage() {
   const [backendStatus, setBackendStatus] = useState<"checking" | "healthy" | "error">("checking");
+  const [cases, setCases] = useState<CaseSummary[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("http://localhost:8000/health")
       .then((r) => r.json())
       .then((d) => setBackendStatus(d.status === "healthy" ? "healthy" : "error"))
       .catch(() => setBackendStatus("error"));
+
+    fetchCases()
+      .then((data) => {
+        setCases(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
+
+  /* ── Compute live metrics ── */
+  const totalCases = cases.length;
+  const totalAmountAtRisk = cases.reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
+  const pendingCount = cases.filter((c) => c.status === "pending_review").length;
+
+  const metrics = [
+    {
+      title: "Active Disputes",
+      value: loading ? "…" : String(totalCases),
+      change: `${pendingCount} pending review`,
+      changeType: "warning" as const,
+      icon: FileWarning,
+      iconColor: "text-warning",
+      iconBg: "bg-warning/10",
+    },
+    {
+      title: "Win Rate",
+      value: "—",
+      change: "Run analysis to compute",
+      changeType: "success" as const,
+      icon: TrendingUp,
+      iconColor: "text-accent",
+      iconBg: "bg-accent/10",
+    },
+    {
+      title: "Amount at Risk",
+      value: loading ? "…" : `₹${(totalAmountAtRisk / 100000).toFixed(1)}L`,
+      change: `${totalCases} cases loaded`,
+      changeType: "destructive" as const,
+      icon: IndianRupee,
+      iconColor: "text-danger",
+      iconBg: "bg-danger/10",
+    },
+    {
+      title: "Avg Response Time",
+      value: "—",
+      change: "Requires evaluation data",
+      changeType: "success" as const,
+      icon: Clock,
+      iconColor: "text-brand-400",
+      iconBg: "bg-brand-400/10",
+    },
+  ];
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -176,10 +163,12 @@ export default function DashboardPage() {
                     : "Checking…"}
                 </span>
               </div>
-              <Button variant="brand" className="gap-2">
-                <Shield className="h-4 w-4" />
-                New Analysis
-              </Button>
+              <Link href="/disputes">
+                <Button variant="brand" className="gap-2">
+                  <Shield className="h-4 w-4" />
+                  View Disputes
+                </Button>
+              </Link>
             </div>
           </div>
 
@@ -225,81 +214,83 @@ export default function DashboardPage() {
                     Latest chargeback cases requiring attention.
                   </CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="gap-1.5">
-                  View All
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </Button>
+                <Link href="/disputes">
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    View All
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Button>
+                </Link>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="relative overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border/50">
-                      <th className="pb-3 text-left font-medium text-muted-foreground">
-                        Case ID
-                      </th>
-                      <th className="pb-3 text-left font-medium text-muted-foreground">
-                        Merchant
-                      </th>
-                      <th className="pb-3 text-left font-medium text-muted-foreground">
-                        Amount
-                      </th>
-                      <th className="pb-3 text-left font-medium text-muted-foreground">
-                        Reason
-                      </th>
-                      <th className="pb-3 text-left font-medium text-muted-foreground">
-                        Risk
-                      </th>
-                      <th className="pb-3 text-left font-medium text-muted-foreground">
-                        Status
-                      </th>
-                      <th className="pb-3 text-left font-medium text-muted-foreground">
-                        Deadline
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentDisputes.map((dispute, i) => {
-                      const status = statusConfig[dispute.status] ?? {
-                        label: dispute.status,
-                        variant: "secondary" as const,
-                      };
-                      const risk = riskConfig[dispute.risk] ?? {
-                        label: dispute.risk,
-                        color: "text-muted-foreground",
-                      };
-                      return (
-                        <tr
-                          key={dispute.id}
-                          className="border-b border-border/30 transition-colors hover:bg-muted/50 animate-slide-in-right"
-                          style={{ animationDelay: `${400 + i * 60}ms` }}
-                        >
-                          <td className="py-3 font-mono text-xs font-medium text-primary">
-                            {dispute.id}
-                          </td>
-                          <td className="py-3">{dispute.merchant}</td>
-                          <td className="py-3 font-semibold">{dispute.amount}</td>
-                          <td className="py-3 text-muted-foreground">
-                            {dispute.reason}
-                          </td>
-                          <td className="py-3">
-                            <span className={`font-semibold text-xs ${risk.color}`}>
-                              ● {risk.label}
-                            </span>
-                          </td>
-                          <td className="py-3">
-                            <Badge variant={status.variant}>{status.label}</Badge>
-                          </td>
-                          <td className="py-3 text-muted-foreground text-xs">
-                            {dispute.deadline}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              {loading ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Loading cases from API…
+                </div>
+              ) : cases.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  No cases loaded. Check that the backend is running.
+                </div>
+              ) : (
+                <div className="relative overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border/50">
+                        <th className="pb-3 text-left font-medium text-muted-foreground">Case ID</th>
+                        <th className="pb-3 text-left font-medium text-muted-foreground">Merchant</th>
+                        <th className="pb-3 text-left font-medium text-muted-foreground">Amount</th>
+                        <th className="pb-3 text-left font-medium text-muted-foreground">Reason</th>
+                        <th className="pb-3 text-left font-medium text-muted-foreground">Risk</th>
+                        <th className="pb-3 text-left font-medium text-muted-foreground">Status</th>
+                        <th className="pb-3 text-left font-medium text-muted-foreground">Deadline</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cases.slice(0, 8).map((dispute, i) => {
+                        const status = statusConfig[dispute.status] ?? {
+                          label: dispute.status,
+                          variant: "secondary" as const,
+                        };
+                        const risk = riskConfig[dispute.risk_level] ?? {
+                          label: dispute.risk_level,
+                          color: "text-muted-foreground",
+                        };
+                        return (
+                          <tr
+                            key={dispute.id}
+                            className="border-b border-border/30 transition-colors hover:bg-muted/50 animate-slide-in-right cursor-pointer"
+                            style={{ animationDelay: `${400 + i * 60}ms` }}
+                          >
+                            <td className="py-3">
+                              <Link
+                                href={`/disputes/${dispute.id}`}
+                                className="font-mono text-xs font-medium text-primary hover:underline"
+                              >
+                                {dispute.id}
+                              </Link>
+                            </td>
+                            <td className="py-3">{dispute.merchant_name}</td>
+                            <td className="py-3 font-semibold">{formatAmount(dispute.amount)}</td>
+                            <td className="py-3 text-muted-foreground">{dispute.reason.replace(/_/g, " ")}</td>
+                            <td className="py-3">
+                              <span className={`font-semibold text-xs ${risk.color}`}>
+                                ● {risk.label}
+                              </span>
+                            </td>
+                            <td className="py-3">
+                              <Badge variant={status.variant}>{status.label}</Badge>
+                            </td>
+                            <td className="py-3 text-muted-foreground text-xs">
+                              {formatDeadline(dispute.respond_by)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -321,12 +312,12 @@ export default function DashboardPage() {
                     <AlertTriangle className="h-5 w-5 text-warning mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">
-                        High-value case needs immediate attention
+                        Select a case to run analysis
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        DSP-2026-005 (₹45,000) — deadline in 9 days. AI
-                        confidence for successful representment: 62%. Consider
-                        gathering additional delivery proof.
+                        Navigate to any dispute and click &quot;Run AI Analysis&quot;
+                        to see the deterministic evidence assessment, completeness
+                        score, and economic recommendation.
                       </p>
                     </div>
                   </div>
@@ -336,11 +327,11 @@ export default function DashboardPage() {
                     <CheckCircle2 className="h-5 w-5 text-accent mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">
-                        Strong evidence detected
+                        {cases.length} cases loaded from fixtures
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        DSP-2026-002 has matching delivery signatures and
-                        tracking data. AI recommends auto-filing representment.
+                        All synthetic test data is ready for extraction and validation.
+                        Includes strong, weak, corrupted-OCR, and mismatch scenarios.
                       </p>
                     </div>
                   </div>
@@ -350,11 +341,11 @@ export default function DashboardPage() {
                     <XCircle className="h-5 w-5 text-danger mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">
-                        Pattern alert: Repeat offender
+                        Safety: Review required for all contest decisions
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Customer linked to DSP-2026-001 has 3 prior disputes in
-                        6 months. Flag for enhanced review.
+                        AI extraction and scoring are advisory only. A human must
+                        approve every contest before packet generation is enabled.
                       </p>
                     </div>
                   </div>
@@ -364,28 +355,27 @@ export default function DashboardPage() {
 
             <Card className="animate-fade-in" style={{ animationDelay: "580ms" }}>
               <CardHeader>
-                <CardTitle>Resolution Summary</CardTitle>
-                <CardDescription>Last 30 days performance.</CardDescription>
+                <CardTitle>Case Types Overview</CardTitle>
+                <CardDescription>Distribution of loaded synthetic scenarios.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {/* Win/Loss/Pending bars */}
                   {[
-                    { label: "Won",     count: 18, total: 30, color: "bg-accent" },
-                    { label: "Lost",    count: 5,  total: 30, color: "bg-danger" },
-                    { label: "Pending", count: 7,  total: 30, color: "bg-warning" },
+                    { label: "Strong Evidence", count: cases.filter(c => c.risk_level === "low" || c.risk_level === "medium").length, total: totalCases || 1, color: "bg-accent" },
+                    { label: "Missing Evidence", count: cases.filter(c => c.status === "pending_review" && c.risk_level === "medium").length, total: totalCases || 1, color: "bg-warning" },
+                    { label: "High Risk / Critical", count: cases.filter(c => c.risk_level === "high" || c.risk_level === "critical").length, total: totalCases || 1, color: "bg-danger" },
                   ].map((item) => (
                     <div key={item.label} className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">{item.label}</span>
                         <span className="text-muted-foreground">
-                          {item.count}/{item.total}
+                          {item.count}/{totalCases}
                         </span>
                       </div>
                       <div className="h-2 rounded-full bg-muted overflow-hidden">
                         <div
                           className={`h-full rounded-full ${item.color} transition-all duration-1000`}
-                          style={{ width: `${(item.count / item.total) * 100}%` }}
+                          style={{ width: `${(item.count / (totalCases || 1)) * 100}%` }}
                         />
                       </div>
                     </div>
@@ -394,12 +384,14 @@ export default function DashboardPage() {
                   <div className="pt-4 border-t border-border/50">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-accent">₹3.8L</p>
-                        <p className="text-xs text-muted-foreground">Amount Recovered</p>
+                        <p className="text-2xl font-bold text-accent">
+                          {formatAmount(String(totalAmountAtRisk))}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Total Amount at Risk</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-danger">₹1.1L</p>
-                        <p className="text-xs text-muted-foreground">Amount Lost</p>
+                        <p className="text-2xl font-bold text-brand-400">{totalCases}</p>
+                        <p className="text-xs text-muted-foreground">Total Cases Loaded</p>
                       </div>
                     </div>
                   </div>
