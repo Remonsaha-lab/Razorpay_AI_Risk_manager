@@ -28,6 +28,8 @@ import {
   Scale,
   Eye,
   Lock,
+  Brain,
+  BookOpen,
 } from "lucide-react";
 import {
   fetchCase,
@@ -286,6 +288,12 @@ export default function CaseDetailPage() {
                           <span className="text-warning font-medium mr-2">⚠ Human review required</span>
                         )}
                         Evidence Strength: {(decision.evidence_strength * 100).toFixed(0)}%
+                        {decision.ml_win_probability != null && (
+                          <span className="ml-2 pl-2 border-l border-border text-accent font-medium">
+                            <Brain className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
+                            ML Win Probability: {(decision.ml_win_probability * 100).toFixed(1)}%
+                          </span>
+                        )}
                         {" · "}Completeness: {(decision.completeness_score * 100).toFixed(0)}%
                       </p>
                     </div>
@@ -297,6 +305,32 @@ export default function CaseDetailPage() {
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">Accept EV: {formatAmount(decision.accept_expected_value)}</p>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── Representment Narrative ── */}
+          {decision && decision.action === "contest" && decision.narrative && (
+            <Card className="animate-fade-in border-accent/20" style={{ animationDelay: "50ms" }}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  AI-Generated Representment Narrative
+                  {decision.narrative_audited && (
+                    <Badge variant="success" className="ml-2 text-[10px]">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Audit Passed
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Grounded in verified evidence claims only. Reviewed by the factual audit guardrail.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border border-accent/20 bg-accent/5 p-4">
+                  <p className="text-sm leading-relaxed">{decision.narrative}</p>
                 </div>
               </CardContent>
             </Card>

@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import xgboost as xgb
 from sklearn.calibration import CalibratedClassifierCV, calibration_curve
+from sklearn.frozen import FrozenEstimator
 from sklearn.metrics import brier_score_loss
 
 from backend.ml.dataset import make_splits
@@ -43,7 +44,13 @@ def calibrate_model() -> dict:
     raw_brier = brier_score_loss(y_val_np, raw_probs)
 
     # 2. Fit Platt Scaling (Sigmoid) on validation set
-    calibrator = CalibratedClassifierCV(estimator=base_model, method="sigmoid", cv="prefit")
+    # scikit-learn 1.6+ replaces cv="prefit" with FrozenEstimator.  This
+    # freezes the already-trained XGBoost model and fits only Platt scaling
+    # on the validation set.
+    calibrator = CalibratedClassifierCV(
+        estimator=FrozenEstimator(base_model),
+        method="sigmoid",
+    )
     calibrator.fit(X_val_np, y_val_np)
 
     # 3. Calibrated Brier Score

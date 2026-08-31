@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 import json
+import logging
 
 from backend.domain.enums import DisputeAction, EvidenceType, VerificationStatus
 from backend.domain.models import Decision, StrengthFactor
@@ -11,6 +12,8 @@ from backend.services.claim_extractor import extract_claims_for_case
 from backend.validators import validate_amounts, validate_consistency, validate_delivery, validate_identifiers
 from backend.validators.common import ValidationIssue
 from backend.workflow.state import DisputeState
+
+logger = logging.getLogger(__name__)
 
 POLICY_PATH = Path(__file__).parent.parent / "policies" / "merchandise_not_received_v1.json"
 
@@ -124,9 +127,11 @@ def economics_node(state: DisputeState) -> dict:
 
 
 def decide_node(state: DisputeState) -> dict:
-    """Apply policy thresholds and economic EV to finalize dispute recommendation."""
+    """Apply policy thresholds, ML probabilities, and economic EV to finalize decision."""
     dispute = state["dispute"]
+    documents = state["documents"]
     policy = state["policy"]
+    claims = state["claims"]
     issues = state["issues"]
     completeness = state["completeness_score"]
     strength = state["evidence_strength"]
@@ -137,9 +142,49 @@ def decide_node(state: DisputeState) -> dict:
     negatives = state["negative_factors"]
 
     thresholds = policy.get("thresholds", {})
-    assumptions = policy.get("economic_assumptions", {})
-    contest_cost = Decimal(str(assumptions.get("contest_cost_inr", "500.00")))
+    assumptions_cfg = policy.get("economic_assumptions", {})
+    contest_cost = Decimal(str(assumptions_cfg.get("contest_cost_inr", "500.00")))
 
+    # ── 1. Calculate ML Win Probability ──
+    ml_win_prob = None
+    raw_ml_score = None
+    try:
+        from backend.ml.features import build_features
+        from backend.ml.predict import predict_contest_probability
+
+        fixture_mock = {
+            "id": dispute.id,
+            "amount": str(dispute.amount),
+            "respond_by": dispute.respond_by.isoformat(),
+            "reason": dispute.reason.value,
+            "risk_level": dispute.risk_level.value,
+            "evidence_documents": [
+                {
+                    "type": d.type.value,
+                    "extraction_method": d.extraction_method.value,
+                    "extraction_confidence": d.extraction_confidence,
+                }
+                for d in documents
+            ],
+        }
+        workflow_mock = {
+            "decision": {
+                "completeness_score": completeness,
+                "evidence_strength": strength,
+            },
+            "claims": claims,
+            "issues": issues,
+        }
+        feat = build_features(fixture_mock, workflow_mock)
+        ml_res = predict_contest_probability(feat)
+        ml_win_prob = ml_res["calibrated_probability"]
+        raw_ml_score = ml_res["raw_score"]
+        logger.info("ML prediction: calibrated=%.4f raw=%.4f", ml_win_prob, raw_ml_score)
+    except Exception as exc:
+        logger.warning("ML prediction unavailable, falling back to evidence_strength: %s", exc)
+        ml_win_prob = round(strength, 4)
+
+    # ── 2. Determine Action ──
     now = datetime.now(timezone.utc)
     deadline_open = dispute.respond_by > now
     contradictions = bool(issues)
@@ -162,21 +207,38 @@ def decide_node(state: DisputeState) -> dict:
         action = DisputeAction.ACCEPT_LOSS
         reason = "Evidence strength or contest economics does not meet policy threshold"
 
+    # ── 3. Generate Audited Representment Narrative (CONTEST cases only) ──
+    narrative_text = None
+    narrative_passed_audit = False
+    if action == DisputeAction.CONTEST:
+        try:
+            from backend.services.narrative_generator import generate_representment_narrative
+            narrative_text, narrative_passed_audit = generate_representment_narrative(
+                dispute, claims, documents
+            )
+            logger.info("Narrative generated (audited=%s)", narrative_passed_audit)
+        except Exception as exc:
+            logger.warning("Narrative generation failed: %s", exc)
+
     decision = Decision(
         dispute_id=dispute.id,
         action=action,
         review_required=contradictions or action == DisputeAction.CONTEST,
         completeness_score=completeness,
         evidence_strength=strength,
+        ml_win_probability=ml_win_prob,
+        raw_model_score=raw_ml_score,
+        narrative=narrative_text,
+        narrative_audited=narrative_passed_audit,
         contest_expected_value=contest_ev,
         accept_expected_value=accept_ev,
         positive_factors=positives,
         negative_factors=negatives,
         reasons=[reason] + [issue.message for issue in issues],
         assumptions=[
-            "Evidence strength is an explainable prototype estimate, not a calibrated probability.",
+            f"Calibrated ML Win Probability: {ml_win_prob * 100:.1f}% (XGBoost + Platt Scaling)." if ml_win_prob else "Evidence strength is an explainable prototype estimate.",
             f"Contest cost assumption: INR {contest_cost:.2f}.",
-            assumptions.get("note", "Synthetic economic assumptions."),
+            assumptions_cfg.get("note", "Synthetic economic assumptions."),
         ],
     )
 

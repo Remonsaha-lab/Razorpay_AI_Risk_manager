@@ -84,3 +84,13 @@ def predict_contest_probability(feature_dict: dict[str, float]) -> dict[str, Any
         "dataset_version": _schema.get("dataset_version", "unknown"),
         "feature_schema_version": _schema.get("feature_schema_version", "unknown"),
     }
+
+
+if __name__ == "__main__":
+    from backend.ml.dataset import load_all_features
+    sample = load_all_features()[0]
+    res = predict_contest_probability(sample)
+    print(f"\n[predict] Test Inference on Case: {sample.get('_case_id')}")
+    print(f"  • Raw Score:              {res['raw_score']}")
+    print(f"  • Calibrated Probability: {res['calibrated_probability'] * 100:.2f}%")
+    print(f"  • Model Version:          {res['model_version']}\n")

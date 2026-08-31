@@ -187,51 +187,38 @@ class Decision(BaseModel):
 
     id: str = Field(default_factory=lambda: f"DEC-{_new_id()}")
     dispute_id: str
-
     # Recommendation
     action: DisputeAction
     review_required: bool = False
-
     # Evidence assessment
-    completeness_score: float = Field(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        description="Verified required evidence / total required evidence",
+    completeness_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    evidence_strength: float = Field(default=0.0, ge=0.0, le=1.0)
+    # ML Model Prediction
+    ml_win_probability: Optional[float] = Field(
+        default=None,
+        description="Calibrated win probability from the XGBoost model",
     )
-    evidence_strength: float = Field(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        description="Explainable score — NOT a calibrated probability",
+    raw_model_score: Optional[float] = Field(
+        default=None,
+        description="Raw uncalibrated score from the model",
     )
-
+    # LLM Representment Narrative & Audit
+    narrative: Optional[str] = Field(
+        default=None,
+        description="LLM-drafted representment argument grounded in verified claims",
+    )
+    narrative_audited: bool = Field(
+        default=False,
+        description="True if the narrative successfully passed the factual audit guardrail",
+    )
     # Economic analysis
-    contest_expected_value: Decimal = Field(
-        default=Decimal("0"),
-        description="EV of contesting = P(win) × amount − cost",
-    )
-    accept_expected_value: Decimal = Field(
-        default=Decimal("0"),
-        description="EV of accepting loss = −amount (always negative)",
-    )
-
-    # Reasoning
+    contest_expected_value: Decimal = Field(default=Decimal("0"))
+    accept_expected_value: Decimal = Field(default=Decimal("0"))
+    # Reasoning & Factors
     positive_factors: list[StrengthFactor] = Field(default_factory=list)
     negative_factors: list[StrengthFactor] = Field(default_factory=list)
-    reasons: list[str] = Field(
-        default_factory=list,
-        description="Human-readable decision rationale",
-    )
-
-    # Assumptions displayed to reviewer
-    assumptions: list[str] = Field(
-        default_factory=list,
-        description="Economic/model assumptions underpinning the recommendation",
-    )
-
-    # Timestamps
+    reasons: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
     decided_at: datetime = Field(default_factory=datetime.now)
-
     class Config:
         json_encoders = {Decimal: str}

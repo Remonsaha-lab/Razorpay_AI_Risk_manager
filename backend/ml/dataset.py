@@ -77,108 +77,58 @@ def _parse_documents(raw:dict) -> list[EvidenceDocument]:
 def load_all_features(
     fixtures_path: Path = FIXTURES_PATH,
     as_of: datetime = REFERENCE_NOW,
-    skip_unlabeled: bool = True
-    ) -> list[dict]:
-    """Run workflow for all cases and return per-case feature dicts."""
+    skip_unlabeled: bool = True,
+    id_prefix: str = "",
+) -> list[dict]:
     """
     Load fixture cases, run deterministic validation, and
     generate ML features.
-
-    Parameters
-    ----------
-    fixtures_path:
-        Location of cases.json.
-
-    as_of:
-        Reference timestamp used for time-dependent features.
-
-    skip_unlabeled:
-        If True, cases without a `won` ground-truth label
-        are excluded.
-
-    Returns
-    -------
-    list[dict]
-        Feature dictionaries.
-
-        Each row contains:
-            - FEATURE_NAMES
-            - _case_id
-            - won_contest
     """
-    
-    raw_data = json.loads(fixtures_path.read_text(encoding = "utf-8"))
+    raw_data = json.loads(fixtures_path.read_text(encoding="utf-8"))
     cases = raw_data.get("cases", [])
     if not cases:
         raise ValueError("No cases found")
 
-    if not isinstance(cases , list):
+    if not isinstance(cases, list):
         raise ValueError("Expected cases to be a list in case.json")
 
-    # process cases
-
     rows: list[dict] = []
-
     skipped_no_label = 0
     skipped_error = 0
 
     for case_raw in cases:
-        case_id = case_raw.get(
-            "id",
-            "?"
-        )
+        case_id = case_raw.get("id", "?")
+        if id_prefix and not case_id.startswith(id_prefix):
+            case_id = f"{id_prefix}{case_id}"
 
         # ground truth label
-
         won = case_raw.get("won")
-
         if skip_unlabeled and won is None:
             skipped_no_label += 1
             continue
 
-        # make sure the target in Binary
-
-        if won not in (0 , 1, True , False):
-            print(f"[dataset] skipping {case_id}",
-            f"invalid won label: {won!r}")
-
+        if won not in (0, 1, True, False):
+            print(f"[dataset] skipping {case_id}", f"invalid won label: {won!r}")
             skipped_error += 1
             continue
 
         try:
-            #Fixture -> Domain objects
-
             dispute = _parse_dispute(case_raw)
             documents = _parse_documents(case_raw)
-
-            #Deterministic workflow
-
             workflow_result = run_workflow(dispute, documents)
-
-            # Workflow result -> Ml features
             features = build_features(
                 case_raw,
                 workflow_result,
-                as_of=as_of
-            )  
+                as_of=as_of,
+            )
 
-            #attach meta data
             features["_case_id"] = case_id
-
-            # This is the actual historical/synthetic outcome.
-            #
-            # IMPORTANT:
-            # This must NOT be the policy recommendation.
             features["won_contest"] = float(bool(won))
-
             rows.append(features)
 
         except Exception as exc:
             skipped_error += 1
-
-            print(
-                f"[dataset] Skipping {case_id}: {exc}"
-            ) 
+            print(f"[dataset] Skipping {case_id}: {exc}")
 
     print(
         f"[dataset] Loaded {len(rows)} labeled cases "
@@ -187,9 +137,7 @@ def load_all_features(
     )
 
     if not rows:
-        raise ValueError(
-            "No labeled cases were successfully loaded."
-        )
+        raise ValueError("No labeled cases were successfully loaded.")
 
     return rows
 
@@ -197,11 +145,9 @@ def load_all_features(
 def load_held_out_features(
     as_of: datetime = REFERENCE_NOW,
 ) -> list[dict]:
-    """Load labeled cases reserved exclusively for final model evaluation."""
-    return load_all_features(fixtures_path=HELD_OUT_TEST_PATH, as_of=as_of)
+    """Load labeled cases reserved exclusively for final model evaluation with unique TEST- IDs."""
+    return load_all_features(fixtures_path=HELD_OUT_TEST_PATH, as_of=as_of, id_prefix="TEST-")
 
-
-### Train / validation split
 
 def make_splits(
     rows: list[dict] | None = None,
@@ -213,54 +159,14 @@ def make_splits(
     list[list[float]],
     list[float],
 ]:
-    """
-    Create a stratified train/validation split.
-
-    There is intentionally NO test set.
-
-    Parameters
-    ----------
-    rows:
-        Feature rows returned by load_all_features().
-
-        If None, the fixture dataset is loaded automatically.
-
-    train_ratio:
-        Fraction of cases used for training.
-
-        Default:
-            0.70 → 70% train
-            0.30 → 30% validation
-
-    seed:
-        Random seed used for reproducibility.
-
-    Returns
-    -------
-    X_train, y_train, X_val, y_val
-
-    X_train:
-        Training feature vectors.
-
-    y_train:
-        Training labels.
-
-    X_val:
-        Validation feature vectors.
-
-    y_val:
-        Validation labels.
-    """
-
+    """Create a stratified train/validation split."""
     if rows is None:
         rows = load_all_features()
 
-    # build x and y
     x = [features_as_vector(row) for row in rows]
     y = [row.get("won_contest", 0.0) for row in rows]
-    ids = [row.get("_case_id" , "") for row in rows]
+    ids = [row.get("_case_id", "") for row in rows]
 
-    # Stratified split — preserves label ratio in both sets
     X_train, X_val, y_train, y_val, ids_train, ids_val = train_test_split(
         x, y, ids,
         test_size=1.0 - train_ratio,
@@ -268,21 +174,7 @@ def make_splits(
         stratify=y,
     )
     n_pos_train = sum(1 for label in y_train if label == 1.0)
-    n_pos_val   = sum(1 for label in y_val   if label == 1.0)
-    print(
-        f"[dataset] Train: {len(X_train)} rows "
-        f"({n_pos_train/len(y_train):.0%} won)"
-    )
-
-    print(
-        f"[dataset]   Val: {len(X_val)} rows "
-        f"({n_pos_val/len(y_val):.0%} won)"
-    )
+    n_pos_val = sum(1 for label in y_val if label == 1.0)
+    print(f"[dataset] Train: {len(X_train)} rows ({n_pos_train/len(y_train):.0%} won)")
+    print(f"[dataset]   Val: {len(X_val)} rows ({n_pos_val/len(y_val):.0%} won)")
     return X_train, y_train, X_val, y_val
-    
-
-
-        
-            
-        
-

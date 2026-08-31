@@ -66,6 +66,13 @@ export interface Decision {
   review_required: boolean;
   completeness_score: number;
   evidence_strength: number;
+  // ML Model Prediction
+  ml_win_probability?: number;
+  raw_model_score?: number;
+  // LLM Representment Narrative & Audit
+  narrative?: string;
+  narrative_audited?: boolean;
+  // Economics
   contest_expected_value: string;
   accept_expected_value: string;
   positive_factors: StrengthFactor[];

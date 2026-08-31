@@ -1,12 +1,14 @@
 """DisputeGuard — FastAPI application entry point."""
 
+from dotenv import load_dotenv
+load_dotenv()  # Load .env before any other imports
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import router
-
 from backend.services.case_loader import store
 
 
