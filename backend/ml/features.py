@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Any
 
 # ── Feature schema (MUST stay in this exact order forever) ──────────────────
@@ -50,8 +49,6 @@ FEATURE_NAMES: list[str] = [
     # ── Layer 2: Workflow output — decision-level ──
     "completeness_score",                # fraction of required docs with ≥1 VERIFIED claim
     "evidence_strength",                 # explainable scoring function output [0, 1]
-    "contest_ev_normalised",             # contest_EV / amount  (sign-preserving)
-    "accept_ev_normalised",              # accept_EV / amount   (always -1.0)
 
     # ── Layer 2: Workflow output — claim-level counts ──
     "n_claims_total",                    # total claims extracted
@@ -73,7 +70,7 @@ FEATURE_NAMES: list[str] = [
     "has_amount_mismatch",               # rule_id == "amount_match"
     "has_order_id_mismatch",             # rule_id == "order_id_match"
     "has_late_delivery",                 # rule_id == "delivery_before_deadline"
-    "has_no_delivery_event",             # rule_id == "delivery_independent"
+    "has_no_delivery_event",             # rule_id == "delivery_event"
     "has_ocr_unconfirmed",               # rule_id == "tracking_ocr_confirmation"
     "has_address_conflict",              # rule_id == "address_consistency"
     "n_blocking_issues",                 # issues excluding tracking_ocr_confirmation
@@ -151,11 +148,6 @@ def build_features(
     completeness    = float(_value(decision, "completeness_score", 0) or 0)
     evidence_str    = float(_value(decision, "evidence_strength",  0) or 0)
 
-    contest_ev_raw  = _value(decision, "contest_expected_value", Decimal("0"))
-    accept_ev_raw   = _value(decision, "accept_expected_value",  Decimal("-1"))
-    contest_ev_norm = float(contest_ev_raw) / amount if amount else 0.0
-    accept_ev_norm  = float(accept_ev_raw)  / amount if amount else -1.0
-
     # Claim-level aggregates
     n_total    = len(claims)
     n_verified = sum(1 for c in claims if _status(c) == "verified")
@@ -205,8 +197,6 @@ def build_features(
         # Layer 2 — decision
         "completeness_score":    completeness,
         "evidence_strength":     evidence_str,
-        "contest_ev_normalised": contest_ev_norm,
-        "accept_ev_normalised":  accept_ev_norm,
 
         # Layer 2 — claim counts
         "n_claims_total":    float(n_total),

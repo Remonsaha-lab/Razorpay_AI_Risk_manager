@@ -8,10 +8,8 @@ No test set — evaluation uses cross-validation on the training set.
 from __future__ import annotations
 import json
 from pathlib import Path
-import pandas as pd 
 from sklearn.model_selection import train_test_split
 from datetime import datetime, timezone
-from decimal import Decimal
 from backend.domain.models import Dispute, EvidenceDocument
 from backend.domain.enums import (
     DisputeReason, DisputeStatus, EvidenceType, ExtractionMethod, RiskLevel,
@@ -21,6 +19,7 @@ from backend.workflow.engine import run_workflow
 
 # configration
 FIXTURES_PATH = Path(__file__).parent.parent.parent / "data" / "fixtures" / "cases.json"
+HELD_OUT_TEST_PATH = Path(__file__).parent.parent.parent / "data" / "held_out" / "test.json"
 RANDOM_SEED = 42
 TRAIN_RATIO = 0.80  # 80% train, 20% validation
 # Stable reference timestamp so feature values are reproducible
@@ -193,6 +192,13 @@ def load_all_features(
         )
 
     return rows
+
+
+def load_held_out_features(
+    as_of: datetime = REFERENCE_NOW,
+) -> list[dict]:
+    """Load labeled cases reserved exclusively for final model evaluation."""
+    return load_all_features(fixtures_path=HELD_OUT_TEST_PATH, as_of=as_of)
 
 
 ### Train / validation split
