@@ -59,8 +59,8 @@ def generate_representment_narrative(
         try:
             import google.generativeai as genai
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("gemini-1.5-flash")
-
+            model = genai.GenerativeModel("gemini-3.7-flash")
+            
             prompt = f"""
 You are a payment chargeback representment specialist. Draft a concise 1-paragraph representment argument.
 CRITICAL RULE: You MUST ONLY use the following verified facts. Do NOT invent any dates, numbers, or addresses.
