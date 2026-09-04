@@ -87,11 +87,11 @@ Evidence In → Deterministic Validation → Calibrated ML Decision → Represen
 |---|---|---|
 | **Orchestration** | LangGraph (7 nodes) | Deterministic state machine — no autonomous agents |
 | **ML Model** | XGBoost + Platt Scaling | Calibrated win-probability estimation |
-| **LLM** | Gemini 1.5 Pro | Bounded representment narrative generation |
+| **LLM** | Gemini 3.7 flash | Bounded representment narrative generation |
 | **Audit Guardrail** | Python regex verifier | Rejects hallucinated order IDs, tracking IDs, dates |
 | **PDF Engine** | ReportLab | Submission-ready chargeback packet |
 | **Backend API** | FastAPI + Uvicorn | REST API serving dispute analysis and PDF download |
-| **Frontend** | Next.js 14 + TypeScript | Reviewer dashboard with real-time analysis runner |
+| **Frontend** | Next.js 15 + TypeScript | Reviewer dashboard with real-time analysis runner |
 
 ---
 
@@ -144,32 +144,32 @@ All charts generated on the **held-out test set** (never seen during training or
 > Charts saved to: `backend/ml/artifacts/charts/`
 
 ### 1. ROC Curve — Discrimination Quality
-![ROC Curve](docs/charts/01_roc_curve.png)
+![ROC Curve](backend/ml/artifacts/charts/01_roc_curve.png)
 - **AUC = 0.9499**: The curve hugs the top-left corner — the model correctly ranks a winning dispute above a losing one 95% of the time.
 - Optimal Youden's J threshold at **τ = 0.28** (TPR = 0.89, FPR = 0.10).
 
 ### 2. Precision-Recall Curve — False Contest Safety
-![Precision-Recall Curve](docs/charts/02_precision_recall_curve.png)
+![Precision-Recall Curve](backend/ml/artifacts/charts/02_precision_recall_curve.png)
 - **PR-AUC = 0.9570**: Precision stays above 90% for most recall levels.
 - At **τ = 0.70**: Precision ≈ 99.5% with only marginal recall loss — safe for risk-averse merchants.
 
 ### 3. Calibration Curve — Probability Reliability
-![Calibration Curve](docs/charts/03_calibration_curve.png)
+![Calibration Curve](backend/ml/artifacts/charts/03_calibration_curve.png)
 - **Brier Score = 0.0896** (0 = perfect).
 - Bimodal distribution: most predictions cluster near 0.05 or 0.95 — the model is confident and usually correct.
 
 ### 4. Learning Curve — Data Sufficiency
-![Learning Curve](docs/charts/04_learning_curve.png)
+![Learning Curve](backend/ml/artifacts/charts/04_learning_curve.png)
 - Both training AUC (~0.95) and validation AUC (~0.91) **stabilize after ~300 cases**.
 - Small, consistent train/val gap confirms no overfitting.
 
 ### 5. Feature Importance — Decision Drivers
-![Feature Importance](docs/charts/05_feature_importance.png)
+![Feature Importance](backend/ml/artifacts/charts/05_feature_importance.png)
 - `n_blocking_issues` dominates at **63.35% gain** — validation contradiction count is the single strongest predictor.
 - `evidence_strength` (13.99%) and `has_address_conflict` (5.56%) are next.
 
 ### 6. Net-Value-by-Threshold — Business Economics
-![Net Value by Threshold](docs/charts/06_net_value_by_threshold.png)
+![Net Value by Threshold](backend/ml/artifacts/charts/06_net_value_by_threshold.png)
 - Wide net-value plateau between **τ = 0.20–0.60**: system delivers strong ROI across a broad threshold range.
 - **Optimal τ = 0.27** → ₹44.8L. **Default τ = 0.50** → ₹42.9L. Difference is small — system is robust.
 
