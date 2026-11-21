@@ -19,6 +19,8 @@ def validate_delivery(
     claims: list[EvidenceClaim],
     documents: list[EvidenceDocument],
 ) -> list[ValidationIssue]:
+    if dispute is None:
+        return []
     issues: list[ValidationIssue] = []
     carrier_ids = {doc.id for doc in documents if doc.type == EvidenceType.TRACKING_RECORD and doc.source == "carrier_api"}
     status_claims = [claim for claim in claims_for(claims, "delivery_status") if claim.document_id in carrier_ids]

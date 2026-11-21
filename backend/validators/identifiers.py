@@ -12,6 +12,8 @@ def validate_identifiers(
     claims: list[EvidenceClaim],
     documents: list[EvidenceDocument],
 ) -> list[ValidationIssue]:
+    if dispute is None:
+        return []
     issues: list[ValidationIssue] = []
     for claim in claims_for(claims, "order_id"):
         if claim.normalized_value == dispute.order_id.strip().upper():

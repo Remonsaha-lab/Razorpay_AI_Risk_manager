@@ -9,6 +9,8 @@ from backend.validators.common import ValidationIssue, claims_for, normalized_te
 
 
 def validate_consistency(dispute: Dispute, claims: list[EvidenceClaim]) -> list[ValidationIssue]:
+    if dispute is None:
+        return []
     issues: list[ValidationIssue] = []
     for field in ("order_id", "amount", "tracking_id", "delivery_datetime"):
         grouped = claims_for(claims, field)
@@ -31,7 +33,7 @@ def validate_consistency(dispute: Dispute, claims: list[EvidenceClaim]) -> list[
             issues.append(ValidationIssue(f"{field}_consistency", "error", f"Contradictory {field} values", all_ids))
 
     address_claims = claims_for(claims, "shipping_address")
-    if dispute.shipping_address and address_claims:
+    if dispute and dispute.shipping_address and address_claims:
         # Compare address tokens without punctuation so a partial carrier
         # address (for example, without state/pincode) is not a false conflict.
         expected = set(re.findall(r"[a-z0-9]+", normalized_text(dispute.shipping_address)))

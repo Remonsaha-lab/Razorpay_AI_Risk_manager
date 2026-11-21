@@ -6,6 +6,8 @@ from backend.validators.common import ValidationIssue, claims_for, mark, parse_d
 
 
 def validate_amounts(dispute: Dispute, claims: list[EvidenceClaim]) -> list[ValidationIssue]:
+    if dispute is None:
+        return []
     issues: list[ValidationIssue] = []
     for claim in claims_for(claims, "amount"):
         amount = parse_decimal(claim.normalized_value)

@@ -24,18 +24,20 @@ async def health_check():
 @router.get("/cases")
 async def list_cases():
     """Return summary data for all available synthetic dispute cases."""
-    cases = store.get_all_disputes()
+    if not store.get_all_disputes():
+        store.load()
+    cases = store.get_all_disputes()[:20]
     return {
         "cases": [
             {
                 "id": case.id,
                 "merchant_name": case.merchant_name,
-                "amount": case.amount,
+                "amount": str(case.amount),
                 "currency": case.currency,
-                "reason": case.reason,
-                "status": case.status,
-                "respond_by": case.respond_by,
-                "risk_level": case.risk_level,
+                "reason": case.reason.value if hasattr(case.reason, "value") else str(case.reason),
+                "status": case.status.value if hasattr(case.status, "value") else str(case.status),
+                "respond_by": case.respond_by.isoformat() if hasattr(case.respond_by, "isoformat") else str(case.respond_by),
+                "risk_level": case.risk_level.value if hasattr(case.risk_level, "value") else str(case.risk_level),
             }
             for case in cases
         ]
@@ -45,6 +47,8 @@ async def list_cases():
 @router.get("/cases/{case_id}")
 async def get_case(case_id: str):
     """Return one synthetic dispute with its evidence and fixture metadata."""
+    if not store.get_all_disputes():
+        store.load()
     case = store.get_dispute(case_id)
     if case is None:
         raise HTTPException(
@@ -62,6 +66,8 @@ async def get_case(case_id: str):
 @router.post("/cases/{case_id}/run")
 async def run_case(case_id: str):
     """Run extraction and deterministic validation for one case."""
+    if not store.get_all_disputes():
+        store.load()
     case = store.get_dispute(case_id)
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Case {case_id} not found")
@@ -73,6 +79,8 @@ async def run_case(case_id: str):
 @router.get("/cases/{case_id}/decision")
 async def get_decision(case_id: str):
     """Return the most recent workflow result for a case."""
+    if not store.get_all_disputes():
+        store.load()
     if store.get_dispute(case_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Case {case_id} not found")
     result = _workflow_results.get(case_id)
@@ -84,6 +92,8 @@ async def get_decision(case_id: str):
 @router.get("/cases/{case_id}/evidence")
 async def get_evidence(case_id: str):
     """Return extracted claims when available, otherwise source documents."""
+    if not store.get_all_disputes():
+        store.load()
     if store.get_dispute(case_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Case {case_id} not found")
     result = _workflow_results.get(case_id)
@@ -103,6 +113,8 @@ async def approve_case(case_id: str, request: ApprovalRequest = ApprovalRequest(
     Explicit human reviewer approval for a CONTEST recommendation.
     Rejects cases that do not have a CONTEST action recommendation.
     """
+    if not store.get_all_disputes():
+        store.load()
     case = store.get_dispute(case_id)
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Case {case_id} not found")
@@ -129,6 +141,8 @@ async def approve_case(case_id: str, request: ApprovalRequest = ApprovalRequest(
 @router.get("/cases/{case_id}/approval")
 async def get_approval(case_id: str):
     """Check approval status of a case."""
+    if not store.get_all_disputes():
+        store.load()
     approval = _approved_cases.get(case_id)
     return {"is_approved": approval is not None, "approval": approval}
 # ── Add Packet Download Route ────────────────────────────────────────────────
@@ -138,6 +152,8 @@ async def download_packet(case_id: str):
     Generate and download a submission-ready PDF packet for an approved CONTEST case.
     Rejects unapproved cases.
     """
+    if not store.get_all_disputes():
+        store.load()
     case = store.get_dispute(case_id)
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Case {case_id} not found")
