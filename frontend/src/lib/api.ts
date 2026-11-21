@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").trim().replace(/\/+$/, "");
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -119,6 +119,12 @@ export interface WorkflowResult {
 
 /* ── API Functions ── */
 
+export async function checkHealth(): Promise<{ status: string; service?: string }> {
+  return apiFetch<{ status: string; service?: string }>("/health");
+}
+
+export const checkBackendHealth = checkHealth;
+
 export async function fetchCases(): Promise<CaseSummary[]> {
   const data = await apiFetch<{ cases: CaseSummary[] }>("/cases");
   return data.cases;
@@ -159,7 +165,6 @@ export async function fetchApproval(caseId: string): Promise<{ is_approved: bool
 }
 
 export function getPacketDownloadUrl(caseId: string): string {
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  return `${base}/cases/${caseId}/packet`;
+  return `${API_BASE}/cases/${caseId}/packet`;
 }
 

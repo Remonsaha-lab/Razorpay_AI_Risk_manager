@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: disputeguard-backend
+    runtime: python
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: .
+    buildCommand: pip install --upgrade pip && pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.5
+      - key: ENVIRONMENT
+        value: production
+      - key: BACKEND_HOST
+        value: 0.0.0.0
+      - key: ALLOWED_ORIGIN_REGEX
+        value: "^https://.*\\.vercel\\.app$"
+      - key: ALLOWED_ORIGINS
+        value: "http://localhost:3000,http://127.0.0.1:3000"
+      - key: GEMINI_API_KEY
+        sync: false

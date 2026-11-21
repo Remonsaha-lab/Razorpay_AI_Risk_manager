@@ -25,7 +25,7 @@ import {
   XCircle,
   Loader2,
 } from "lucide-react";
-import { fetchCases, type CaseSummary } from "@/lib/api";
+import { fetchCases, checkBackendHealth, type CaseSummary } from "@/lib/api";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" | "destructive" }> = {
   pending_review:      { label: "Pending Review",      variant: "warning" },
@@ -68,8 +68,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:8000/health")
-      .then((r) => r.json())
+    checkBackendHealth()
       .then((d) => setBackendStatus(d.status === "healthy" ? "healthy" : "error"))
       .catch(() => setBackendStatus("error"));
 
