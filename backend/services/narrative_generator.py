@@ -59,7 +59,7 @@ def generate_representment_narrative(
         try:
             import google.generativeai as genai
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("gemini-3.7-flash")
+            model = genai.GenerativeModel("gemini-1.5-flash")
             
             prompt = f"""
 You are a payment chargeback representment specialist. Draft a concise 1-paragraph representment argument.
@@ -79,7 +79,7 @@ Facts:
 
 Draft a professional, authoritative 1-paragraph representment argument.
 """
-            response = model.generate_content(prompt)
+            response = model.generate_content(prompt, request_options={"timeout": 10.0})
             if response and response.text:
                 candidate_narrative = response.text.strip()
         except Exception:

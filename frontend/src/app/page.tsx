@@ -79,6 +79,9 @@ export default function DashboardPage() {
       .then((data) => {
         setCases(data);
         setLoading(false);
+        if (data && data.length > 0) {
+          setBackendStatus("healthy");
+        }
       })
       .catch(() => setLoading(false));
   };
