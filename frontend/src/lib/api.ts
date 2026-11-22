@@ -1,17 +1,44 @@
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").trim().replace(/\/+$/, "");
-
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`API ${res.status}: ${res.statusText}`);
+export function getApiBase(): string {
+  // If explicitly configured via NEXT_PUBLIC_API_URL, use it
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim()) {
+    return process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
   }
-  return res.json() as Promise<T>;
+  // In production browser environments (e.g. *.vercel.app), default to the deployed Render backend
+  if (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    return "https://disputeguard-backend.onrender.com";
+  }
+  // Local development default
+  return "http://localhost:8000";
+}
+
+export const API_BASE = getApiBase();
+
+async function apiFetch<T>(path: string, init?: RequestInit, retries = 2): Promise<T> {
+  const base = getApiBase();
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${base}${path}`, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...init?.headers,
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`API ${res.status}: ${res.statusText}`);
+      }
+      return (await res.json()) as T;
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        // Wait before retry to give Render free-tier time to wake up
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 /* ── TypeScript Interfaces ── */
@@ -165,6 +192,6 @@ export async function fetchApproval(caseId: string): Promise<{ is_approved: bool
 }
 
 export function getPacketDownloadUrl(caseId: string): string {
-  return `${API_BASE}/cases/${caseId}/packet`;
+  return `${getApiBase()}/cases/${caseId}/packet`;
 }
 

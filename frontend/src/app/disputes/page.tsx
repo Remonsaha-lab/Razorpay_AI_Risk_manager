@@ -48,15 +48,25 @@ function formatDate(dateStr: string): string {
 export default function DisputesPage() {
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadCases = () => {
+    setLoading(true);
+    setError(null);
     fetchCases()
       .then((data) => {
         setCases(data);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to connect to backend");
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadCases();
   }, []);
 
   const filtered = filter ? cases.filter((c) => c.risk_level === filter) : cases;
@@ -98,9 +108,21 @@ export default function DisputesPage() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Loading disputes from API…
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Loading disputes from API…</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground/70">
+                    If backend is waking from sleep (Render free tier), this takes ~30 seconds.
+                  </span>
+                </div>
+              ) : error ? (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+                  <div className="text-danger font-medium text-sm">Unable to connect to backend: {error}</div>
+                  <Button variant="outline" size="sm" onClick={loadCases} className="gap-2">
+                    Retry Connection
+                  </Button>
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground">

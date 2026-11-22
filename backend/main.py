@@ -74,7 +74,9 @@ async def root():
     }
 
 
+# Include routes at root (/cases, /health) and with /api/v1 prefix for compatibility
 app.include_router(router)
+app.include_router(router, prefix="/api/v1")
 
 
 if __name__ == "__main__":

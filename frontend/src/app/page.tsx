@@ -67,7 +67,10 @@ export default function DashboardPage() {
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadData = () => {
+    setBackendStatus("checking");
+    setLoading(true);
+
     checkBackendHealth()
       .then((d) => setBackendStatus(d.status === "healthy" ? "healthy" : "error"))
       .catch(() => setBackendStatus("error"));
@@ -78,6 +81,10 @@ export default function DashboardPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   /* ── Compute live metrics ── */
@@ -159,8 +166,17 @@ export default function DashboardPage() {
                     ? "Connected"
                     : backendStatus === "error"
                     ? "Offline"
-                    : "Checking…"}
+                    : "Connecting…"}
                 </span>
+                {backendStatus === "error" && (
+                  <button
+                    onClick={loadData}
+                    className="text-xs font-medium text-accent hover:underline ml-1"
+                    title="Click to retry connecting to the backend"
+                  >
+                    (Retry)
+                  </button>
+                )}
               </div>
               <Link href="/disputes">
                 <Button variant="brand" className="gap-2">
